@@ -157,18 +157,5 @@ frontend/src/                     React pages
 | `queue.integration.test.ts` | Real BullMQ and Redis, end to end |
 | `staffPdf.test.ts`, `qrAddress.test.ts` | PDF access rules and the QR address |
 
----
-
-## 5. Known limitations
-
-* **Polling every 4 seconds**, not live push. Server-sent events would be next.
-* **Escalation only flags.** Nobody is emailed or messaged.
-* **PDFs are made on demand**, not stored. The WhatsApp message carries a link, not the file.
-* **The WhatsApp provider is a fake** inside the same system. A real one needs webhooks.
-* **One shared demo password.** No password reset or user management screen.
-* **Rate limits are counted in memory** per API instance.
-* **No pagination** on lists.
-* **Two batches of the same person submitted at nearly the same moment:** the database still blocks the second certificate and writes an audit row, but the second centre is not told at submit time.
-* **Runs with `tsx`** (no compile step). No frontend tests. No load test.
 
 Production plan (architecture, scaling for results day, failure handling, storage, monitoring, cost): [DEPLOYMENT.md](DEPLOYMENT.md).
