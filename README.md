@@ -53,14 +53,28 @@ Open **http://localhost:8080**. Ports used: 8080 (UI), 4000 (API), 5433 (Postgre
 | Neha | Quality team | |
 | Farah | State office | |
 
+**Your spreadsheet (.xlsx)**
+
+The system starts empty: there is no sample data. Use your own Excel file. The first row must be these column names, one candidate per row:
+
+| Name | Phone | Course | Score |
+|---|---|---|---|
+| Asha Sharma | 9876543210 | Electrician | 72 |
+
+* Phone: 10 digit Indian mobile number (`+91` is accepted and removed).
+* Score: 0 to 100, at least 40 (the pass mark).
+* The same phone cannot repeat in one sheet. A person who already holds a valid certificate for the same course, or is already in another batch under review, is rejected with the exact row.
+
 **Try it in 5 minutes**
 
-1. Log in as **Anika**, create a batch, upload `sample-data/batch_10_with_errors.xlsx`. You see the exact bad rows and nothing is saved.
-2. Upload `sample-data/batch_60_valid_needs_quality.xlsx` and click **Send for approval**.
-3. **Dev** approves, **Meera** approves (batch moves to quality). **Neha** approves, **Farah** approves.
-4. The worker creates 60 certificates and sends WhatsApp messages. Some fail and retry; watch the WhatsApp column.
+1. Log in as **Anika**, create a batch, upload your Excel file. If a row is wrong you see the exact rows and nothing is saved.
+2. Click **Send for approval**.
+3. **Dev** approves, **Meera** approves. If the batch has 50 or more people it moves to quality: **Neha** approves. Then **Farah** approves.
+4. The worker creates the certificates and sends WhatsApp messages. Some fail and retry; watch the WhatsApp column.
 5. As **Farah**, open **State tools** to see the fake WhatsApp inbox and the audit log.
 6. Open **Verify a certificate** (top bar, no login), type a certificate number: genuine. Cancel it as Farah and check again: not valid.
+
+Uploading the same people again for the same course after their batch is approved is refused on purpose (one valid certificate per person per course). Use different people or a different course, or cancel their certificates first.
 
 To start fresh: `docker compose down -v`.
 

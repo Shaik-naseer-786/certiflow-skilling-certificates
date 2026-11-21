@@ -10,10 +10,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "migrate": "prisma migrate deploy",
-    "seed": "tsx prisma/seed.ts",
-    "sample-data": "tsx scripts/makeSampleData.ts"
+    "seed": "tsx prisma/seed.ts"
   },
-  "prisma": { "seed": "tsx prisma/seed.ts" },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "dependencies": {
     "@prisma/client": "^6.2.0",
     "bcryptjs": "^2.4.3",
