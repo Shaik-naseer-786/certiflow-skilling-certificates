@@ -1,0 +1,182 @@
+// Data model for CertiFlow. Every rule that must "never happen" is backed by a
+// UNIQUE constraint here, so the database is the last line of defence.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CENTRE
+  DISTRICT_OFFICER
+  QUALITY
+  STATE
+}
+
+enum BatchStatus {
+  DRAFT
+  IN_REVIEW
+  SENT_BACK
+  REJECTED
+  APPROVED
+}
+
+enum Stage {
+  DISTRICT
+  QUALITY
+  STATE
+}
+
+enum Decision {
+  APPROVE
+  REJECT
+  SEND_BACK
+}
+
+enum CertStatus {
+  ISSUED
+  CANCELLED
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  district     String? // centres and district officers belong to one district
+  createdAt    DateTime @default(now())
+
+  batches   Batch[]
+  approvals Approval[]
+}
+
+model Batch {
+  id              String      @id @default(uuid())
+  name            String
+  district        String
+  centreId        String
+  centre          User        @relation(fields: [centreId], references: [id])
+  status          BatchStatus @default(DRAFT)
+  stage           Stage? // only set while status = IN_REVIEW
+  version         Int         @default(1) // bumped on every resubmission
+  requiresQuality Boolean     @default(false)
+  stageEnteredAt  DateTime? // when the batch reached its current stage (escalation clock)
+  escalatedAt     DateTime? // set once when it sat too long at a stage
+  lastReason      String? // reason from the latest reject / send-back
+  issuedAt        DateTime? // set when every candidate has a certificate
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  candidates   Candidate[]
+  approvals    Approval[]
+  versions     BatchVersion[]
+  certificates Certificate[]
+
+  @@index([status, stageEnteredAt])
+  @@index([district])
+}
+
+model Candidate {
+  id        String @id @default(uuid())
+  batchId   String
+  batch     Batch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rowNumber Int
+  name      String
+  phone     String // normalised 10 digit number
+  course    String
+  score     Int
+
+  certificate Certificate?
+
+  @@unique([batchId, phone]) // same person cannot be twice in a batch
+}
+
+// Frozen copy of the candidate list at the moment of each submission.
+model BatchVersion {
+  id          String   @id @default(uuid())
+  batchId     String
+  batch       Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  version     Int
+  snapshot    Json
+  submittedAt DateTime @default(now())
+
+  @@unique([batchId, version])
+}
+
+// Full approval history. Never updated or deleted.
+model Approval {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  version   Int // approvals only count for the version they were given on
+  stage     Stage
+  officerId String
+  officer   User     @relation(fields: [officerId], references: [id])
+  decision  Decision
+  reason    String?
+  createdAt DateTime @default(now())
+
+  // One officer can decide only once per batch version and stage.
+  @@unique([batchId, version, stage, officerId])
+}
+
+model Certificate {
+  id               String         @id @default(uuid())
+  certNo           String         @unique // random, not guessable
+  candidateId      String         @unique // a candidate can never get two certificates
+  candidate        Candidate      @relation(fields: [candidateId], references: [id])
+  // Copied from the candidate at issue time. Together with status they back a PARTIAL unique index
+  // (phone, lower(course)) WHERE status = 'ISSUED', created in migration 20250102000000_no_duplicate_certificates.
+  // Prisma cannot express partial indexes, so it lives only in the SQL migration.
+  phone            String
+  course           String
+  batchId          String
+  batch            Batch          @relation(fields: [batchId], references: [id])
+  status           CertStatus     @default(ISSUED)
+  downloadToken    String         @unique // secret sent only to the candidate
+  cancelledAt      DateTime?
+  cancelReason     String?
+  cancelledById    String?
+  deliveryStatus   DeliveryStatus @default(PENDING)
+  deliveryAttempts Int            @default(0)
+  lastError        String?
+  issuedAt         DateTime       @default(now())
+
+  @@index([batchId])
+  @@index([deliveryStatus, issuedAt])
+}
+
+// The "phone" side of the fake WhatsApp provider. The unique key makes the
+// provider itself deduplicate retried sends, like a real provider would.
+model ProviderMessage {
+  id             String   @id @default(uuid())
+  idempotencyKey String   @unique
+  phone          String
+  body           String
+  createdAt      DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String? // null = system (workers, scheduler)
+  actorName String
+  action    String
+  entity    String
+  entityId  String
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
