@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
+import '@fontsource-variable/public-sans';
+import '@fontsource-variable/source-serif-4';
 import App from './App';
 import './styles.css';
 

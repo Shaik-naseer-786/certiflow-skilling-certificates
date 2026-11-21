@@ -2,15 +2,44 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, type User } from '../api';
 import { usePolling } from '../hooks';
-import { StatusBadge } from '../components';
+import { BatchChip, Empty, MiniTrack, Notice } from '../components';
+import { timeAgo } from '../format';
 
 type Batch = {
-  id: string; name: string; status: string; stage: string | null; version: number; district: string;
+  id: string; name: string; status: string; stage: string | null; version: number; district: string; requiresQuality: boolean;
   escalatedAt: string | null; centre: { name: string }; _count: { candidates: number }; updatedAt: string;
 };
 
-// A batch is "waiting for me" when it is at the stage my role handles.
+// A batch is "waiting for me" when it is at the step my role handles.
 const myStage = { DISTRICT_OFFICER: 'DISTRICT', QUALITY: 'QUALITY', STATE: 'STATE', CENTRE: null } as const;
+
+function Row({ b, mine }: { b: Batch; mine: boolean }) {
+  return (
+    <Link to={`/batches/${b.id}`} className={`row-item ${mine ? 'mine' : ''}`}>
+      <div className="row-title">
+        <b>{b.name}</b>
+        <small>{b.centre.name}, {b.district} district{b.version > 1 ? `, version ${b.version}` : ''}</small>
+      </div>
+      <div className="row-count num">{b._count.candidates} people</div>
+      <MiniTrack batch={b} />
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <BatchChip status={b.status} stage={b.stage} escalated={!!b.escalatedAt} />
+      </div>
+      <div className="row-end">{mine ? <b style={{ color: 'var(--green)' }}>Your turn</b> : timeAgo(b.updatedAt)}</div>
+    </Link>
+  );
+}
+
+function List({ batches, mineIds }: { batches: Batch[]; mineIds: Set<string> }) {
+  return (
+    <div className="rows">
+      <div className="rows-head" aria-hidden="true">
+        <span>Batch</span><span>People</span><span>Progress</span><span>Status</span><span style={{ textAlign: 'right' }}>Updated</span>
+      </div>
+      {batches.map((b) => <Row key={b.id} b={b} mine={mineIds.has(b.id)} />)}
+    </div>
+  );
+}
 
 export default function Dashboard({ user }: { user: User }) {
   const { data, error, reload } = usePolling<{ batches: Batch[] }>('/batches');
@@ -20,6 +49,7 @@ export default function Dashboard({ user }: { user: User }) {
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
     try {
       const r = await api<{ batch: Batch }>('/batches', { body: { name } });
       navigate(`/batches/${r.batch.id}`);
@@ -29,46 +59,75 @@ export default function Dashboard({ user }: { user: User }) {
   };
 
   const batches = data?.batches ?? [];
-  const waiting = batches.filter((b) => b.status === 'IN_REVIEW' && b.stage === myStage[user.role]);
+  const isCentre = user.role === 'CENTRE';
+  const mine = batches.filter((b) => b.status === 'IN_REVIEW' && b.stage === myStage[user.role]);
+  const mineIds = new Set(mine.map((b) => b.id));
+  const others = batches.filter((b) => !mineIds.has(b.id));
+  const count = (f: (b: Batch) => boolean) => batches.filter(f).length;
 
   return (
     <>
-      <h2>{user.role === 'CENTRE' ? 'My batches' : 'Batches'}</h2>
-      {error && <p className="error">{error}</p>}
+      <header className="page-head">
+        <div>
+          <h1>{isCentre ? 'Your batches' : 'Batches'}</h1>
+          <p>
+            {isCentre
+              ? 'Create a batch, upload the passed candidates, and follow it until every certificate is delivered.'
+              : mine.length > 0
+                ? `${mine.length} batch${mine.length > 1 ? 'es are' : ' is'} waiting for your decision.`
+                : 'Nothing is waiting for your decision right now.'}
+          </p>
+        </div>
+        {isCentre && (
+          <form onSubmit={create} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <label className="sr-only" htmlFor="batch-name">Batch name</label>
+            <input id="batch-name" className="input" style={{ width: 280 }} placeholder="Batch name, for example Electrician May" value={name} onChange={(e) => setName(e.target.value)} />
+            <button className="btn btn-primary" type="submit" disabled={name.trim().length < 3}>Create batch</button>
+          </form>
+        )}
+      </header>
 
-      {user.role === 'CENTRE' && (
-        <form className="card inline" onSubmit={create}>
-          <input placeholder="New batch name, e.g. Electrician May 2025" value={name} onChange={(e) => setName(e.target.value)} />
-          <button type="submit">Create batch</button>
-          {formError && <span className="error">{formError}</span>}
-        </form>
+      {formError && <div style={{ marginBottom: 16 }}><Notice tone="bad">{formError}</Notice></div>}
+      {error && <div style={{ marginBottom: 16 }}><Notice tone="bad">{error}</Notice></div>}
+
+      <section className="strip" aria-label="Summary">
+        <div className={mine.length ? 'hot' : ''}><b>{isCentre ? count((b) => b.status === 'DRAFT') : mine.length}</b><span>{isCentre ? 'Drafts' : 'Waiting for you'}</span></div>
+        <div><b>{count((b) => b.status === 'IN_REVIEW')}</b><span>In review</span></div>
+        <div className={count((b) => b.status === 'SENT_BACK') ? 'warn' : ''}><b>{count((b) => b.status === 'SENT_BACK')}</b><span>Sent back</span></div>
+        <div><b>{count((b) => b.status === 'APPROVED')}</b><span>Approved</span></div>
+      </section>
+
+      {!data && !error && <p className="muted">Loading batches</p>}
+
+      {data && batches.length === 0 && (
+        <div className="panel">
+          {isCentre ? (
+            <Empty icon="batches" title="No batches yet">Name a batch above, then upload your Excel sheet with Name, Phone, Course and Score.</Empty>
+          ) : (
+            <Empty icon="inbox" title="No batches to show yet">Batches appear here once a training centre sends them for approval.</Empty>
+          )}
+        </div>
       )}
 
-      {user.role !== 'CENTRE' && (
-        <p className="banner">Waiting for you: <b>{waiting.length}</b> batch(es)</p>
+      {mine.length > 0 && (
+        <section style={{ marginBottom: 28 }}>
+          <h2 style={{ font: '600 18px var(--font-ui)', marginBottom: 10 }}>Waiting for you</h2>
+          <List batches={mine} mineIds={mineIds} />
+        </section>
       )}
 
-      <table>
-        <thead>
-          <tr><th>Batch</th><th>Centre</th><th>District</th><th>Candidates</th><th>Version</th><th>Status</th><th></th></tr>
-        </thead>
-        <tbody>
-          {batches.map((b) => (
-            <tr key={b.id} className={waiting.includes(b) ? 'highlight' : ''}>
-              <td><Link to={`/batches/${b.id}`}>{b.name}</Link></td>
-              <td>{b.centre.name}</td>
-              <td>{b.district}</td>
-              <td>{b._count.candidates}</td>
-              <td>v{b.version}</td>
-              <td><StatusBadge status={b.status} stage={b.stage} escalated={!!b.escalatedAt} /></td>
-              <td>{waiting.includes(b) && <b>Your turn</b>}</td>
-            </tr>
-          ))}
-          {batches.length === 0 && <tr><td colSpan={7} className="muted">No batches yet.</td></tr>}
-        </tbody>
-      </table>
-      <button className="link" onClick={reload}>Refresh now</button>
-      <span className="muted"> (updates automatically every few seconds)</span>
+      {others.length > 0 && (
+        <section>
+          {mine.length > 0 && <h2 style={{ font: '600 18px var(--font-ui)', marginBottom: 10 }}>All other batches</h2>}
+          <List batches={others} mineIds={mineIds} />
+        </section>
+      )}
+
+      {data && batches.length > 0 && (
+        <p className="muted" style={{ marginTop: 14, fontSize: 13.5 }}>
+          This page refreshes by itself every few seconds. <button type="button" className="btn btn-ghost btn-sm" onClick={reload}>Refresh now</button>
+        </p>
+      )}
     </>
   );
 }
