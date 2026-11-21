@@ -313,7 +313,7 @@ table.data tr:hover td { background: #fafcfa; }
 .sample-cert::before { content: ''; position: absolute; inset: 7px; border: 1px solid #cdb97a; border-radius: 3px; pointer-events: none; }
 .sample-cert small { color: #6d7c75; font-size: 12px; }
 .sample-cert .t { font: 600 20px/1.2 var(--font-serif); margin: 4px 0 10px; }
-.sample-cert .who { font: 600 17px var(--font-serif); }
+.sample-cert .holder { font: 600 17px var(--font-serif); }
 .sample-cert .no { font: 500 12.5px ui-monospace, Consolas, monospace; color: #4a5a53; margin-top: 10px; }
 .sample-cert .mini-seal { position: absolute; right: 16px; bottom: 14px; width: 62px; height: 62px; }
 .login-form { display: grid; place-content: center; padding: 40px 28px; }
@@ -405,3 +405,12 @@ table.data tr:hover td { background: #fafcfa; }
 
 /* Verify page when shown inside the signed-in layout */
 .content .verify-wrap { width: 100%; margin: 0; padding: 0; }
+
+/* placeholders shown while data loads, same size as the real thing so nothing jumps */
+.who.skeleton { cursor: default; }
+.who.skeleton .avatar { background: var(--sunken); }
+.who.skeleton b, .who.skeleton small { display: block; background: var(--sunken); color: transparent; border-radius: 4px; }
+.who.skeleton small { margin-top: 4px; }
+.row-item.skeleton .bar { display: block; height: 14px; border-radius: 4px; background: var(--sunken); }
+.splash { min-height: 100vh; display: grid; place-items: center; background: var(--green-deep); }
+.splash .brand-mark { width: 52px; height: 52px; opacity: .9; }

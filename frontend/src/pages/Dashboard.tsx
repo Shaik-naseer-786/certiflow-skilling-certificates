@@ -91,13 +91,19 @@ export default function Dashboard({ user }: { user: User }) {
       {error && <div style={{ marginBottom: 16 }}><Notice tone="bad">{error}</Notice></div>}
 
       <section className="strip" aria-label="Summary">
-        <div className={mine.length ? 'hot' : ''}><b>{isCentre ? count((b) => b.status === 'DRAFT') : mine.length}</b><span>{isCentre ? 'Drafts' : 'Waiting for you'}</span></div>
-        <div><b>{count((b) => b.status === 'IN_REVIEW')}</b><span>In review</span></div>
-        <div className={count((b) => b.status === 'SENT_BACK') ? 'warn' : ''}><b>{count((b) => b.status === 'SENT_BACK')}</b><span>Sent back</span></div>
-        <div><b>{count((b) => b.status === 'APPROVED')}</b><span>Approved</span></div>
+        <div className={mine.length ? 'hot' : ''}><b>{!data ? '-' : isCentre ? count((b) => b.status === 'DRAFT') : mine.length}</b><span>{isCentre ? 'Drafts' : 'Waiting for you'}</span></div>
+        <div><b>{!data ? '-' : count((b) => b.status === 'IN_REVIEW')}</b><span>In review</span></div>
+        <div className={count((b) => b.status === 'SENT_BACK') ? 'warn' : ''}><b>{!data ? '-' : count((b) => b.status === 'SENT_BACK')}</b><span>Sent back</span></div>
+        <div><b>{!data ? '-' : count((b) => b.status === 'APPROVED')}</b><span>Approved</span></div>
       </section>
 
-      {!data && !error && <p className="muted">Loading batches</p>}
+      {!data && !error && (
+        <div className="rows" aria-busy="true" aria-label="Loading batches">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="row-item skeleton"><span className="bar" /><span className="bar" /><span className="bar" /><span className="bar" /><span className="bar" /></div>
+          ))}
+        </div>
+      )}
 
       {data && batches.length === 0 && (
         <div className="panel">

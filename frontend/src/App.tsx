@@ -86,7 +86,7 @@ function AccessDenied() {
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(!getToken()); // no saved login: show the login page immediately
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -105,7 +105,7 @@ export default function App() {
     navigate('/');
   };
 
-  if (!ready) return <p className="muted" style={{ textAlign: 'center', marginTop: 80 }}>Loading</p>;
+  if (!ready) return <div className="splash"><BrandMark /></div>;
 
   // Verification is public: anyone can open it without signing in.
   const verifyRoutes = (
